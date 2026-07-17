@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digital Twin Dashboard</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    padding:0;
+    min-height:100vh;
+    background:#000;
+    color:#e5e5e5;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  .page{
+    max-width:1400px;
+    margin:0 auto;
+    padding:2rem 2rem 3rem;
+  }
+  .stat-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+    margin-bottom:1.25rem;
+  }
+  .stat-card{
+    background:#141414;
+    border:0.5px solid #262626;
+    border-radius:10px;
+    padding:1.1rem 1.25rem;
+  }
+  .stat-card p.label{
+    font-size:13px;
+    color:#9a9a9a;
+    margin:0 0 6px;
+  }
+  .stat-card p.value{
+    font-size:26px;
+    font-weight:600;
+    margin:0;
+    color:#f5f5f5;
+  }
+  .machine-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:12px;
+    margin-bottom:1.25rem;
+  }
+  .machine-card{
+    background:#141414;
+    border-radius:10px;
+    padding:1.1rem 1.25rem;
+    cursor:pointer;
+    border:0.5px solid #262626;
+    transition:border-color .15s;
+  }
+  .machine-card:hover{border-color:#4a4a4a; background:#181818;}
+  .machine-card.selected{border-color:#8a8aff; box-shadow:0 0 0 1px #8a8aff inset;}
+  .machine-card:active{transform:scale(0.99);}
+  .machine-card p.label{font-size:13px; color:#9a9a9a; margin:0 0 10px;}
+  .machine-card .status-row{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .machine-card .status-text{font-size:15px; font-weight:600; color:#f0f0f0;}
+  .machine-card .util-text{font-size:12px; color:#7a7a7a; margin:0;}
+  .machine-card .hint{font-size:11px; color:#5a5a5a; margin:6px 0 0;}
+  .gantt-panel{
+    background:#141414;
+    border:0.5px solid #262626;
+    border-radius:10px;
+    padding:1.25rem;
+    margin-bottom:1.25rem;
+    position:relative;
+  }
+  .gantt-row-label{font-size:13px; color:#9a9a9a; margin-bottom:4px;}
+  .gantt-row{
+    position:relative;
+    height:36px;
+    margin-bottom:10px;
+    background:#232323;
+    border-radius:5px;
+  }
+  .gantt-axis{
+    display:flex;
+    justify-content:space-between;
+    font-size:12px;
+    color:#7a7a7a;
+    margin-top:6px;
+  }
+  #tooltip{
+    position:absolute;
+    display:none;
+    background:#2a2a2a;
+    border:1px solid #3d3d3d;
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:13px;
+    line-height:1.5;
+    color:#f0f0f0;
+    pointer-events:none;
+    z-index:5;
+    white-space:nowrap;
+  }
+  .controls-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    background:#141414;
+    border:0.5px solid #262626;
+    border-radius:10px;
+    padding:1rem 1.25rem;
+    margin-bottom:1.25rem;
+  }
+  .transport-group{display:flex; align-items:center; gap:8px;}
+  .icon-btn{
+    width:42px; height:42px; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    background:#1f1f1f; border:1px solid #454545; border-radius:9px;
+    color:#f5f5f5; cursor:pointer;
+    transition:background .15s, border-color .15s, transform .08s;
+  }
+  .icon-btn svg{width:18px; height:18px; display:block; fill:currentColor;}
+  .icon-btn:hover{background:#2c2c2c; border-color:#5a5a5a;}
+  .icon-btn:active{transform:scale(0.92);}
+  .icon-btn:focus-visible{outline:2px solid #8a8aff; outline-offset:2px;}
+  #play-btn{
+    background:#e8e8e8; border-color:#e8e8e8; color:#111;
+    width:48px; height:48px;
+  }
+  #play-btn svg{width:20px; height:20px;}
+  #play-btn:hover{background:#ffffff; border-color:#ffffff;}
+  .slider-wrap{flex:1; min-width:160px; display:flex; align-items:center; gap:10px;}
+  .slider-time{font-size:12px; color:#9a9a9a; min-width:38px; text-align:right; font-variant-numeric:tabular-nums;}
+  input[type="range"]{
+    flex:1;
+    -webkit-appearance:none;
+    height:4px;
+    background:#333;
+    border-radius:2px;
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:#f0f0f0;
+    cursor:pointer;
+    border:none;
+    box-shadow:0 0 0 3px rgba(240,240,240,0.15);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:18px; height:18px;
+    border-radius:50%;
+    background:#f0f0f0;
+    cursor:pointer;
+    border:none;
+    box-shadow:0 0 0 3px rgba(240,240,240,0.15);
+  }
+  .speed-group{display:flex; gap:6px; background:#1f1f1f; border:1px solid #3d3d3d; border-radius:9px; padding:3px;}
+  .speed-btn{
+    background:transparent; border:none; color:#9a9a9a; padding:7px 11px;
+    font-size:12px; font-weight:600; border-radius:6px; cursor:pointer;
+    transition:background .15s, color .15s;
+  }
+  .speed-btn:hover{color:#f0f0f0;}
+  .speed-btn.active{background:#e8e8e8; color:#111;}
+  .legend-row{
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    font-size:13px; color:#b0b0b0;
+  }
+  .legend-btn{
+    display:flex; align-items:center; gap:0; background:#141414;
+    border:1px solid #262626; border-radius:8px; padding:6px 12px 6px 10px;
+    cursor:pointer; color:#b0b0b0; font-size:13px; transition:border-color .15s, opacity .15s;
+  }
+  .legend-btn:hover{border-color:#4a4a4a;}
+  .legend-btn.dimmed{opacity:0.4;}
+  .legend-swatch{
+    display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:8px;
+  }
+  .legend-hint{margin-left:auto; color:#6a6a6a; font-size:12px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="stat-grid">
+    <div class="stat-card"><p class="label">Sim time</p><p class="value" id="stat-time">0.0</p></div>
+    <div class="stat-card"><p class="label">Makespan</p><p class="value">154.1</p></div>
+    <div class="stat-card"><p class="label">Ops completed</p><p class="value" id="stat-ops">0</p></div>
+    <div class="stat-card"><p class="label">Avg utilization</p><p class="value" id="stat-util">0%</p></div>
+  </div>
+
+  <div id="machine-cards" class="machine-grid"></div>
+
+  <div class="gantt-panel">
+    <div id="gantt-rows"></div>
+    <div class="gantt-axis"><span>0</span><span>154.1</span></div>
+    <div id="tooltip"></div>
+  </div>
+
+  <div class="controls-row">
+    <div class="transport-group">
+      <button id="skip-start-btn" class="icon-btn" aria-label="Jump to start" title="Jump to start">
+        <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM20 6L9 12l11 6z"/></svg>
+      </button>
+      <button id="step-back-btn" class="icon-btn" aria-label="Previous event" title="Previous event (across all machines)">
+        <svg viewBox="0 0 24 24"><path d="M11 6v12l-8.5-6zM13 6l8.5 6-8.5 6z" transform="scale(-1,1) translate(-24,0)"/></svg>
+      </button>
+      <button id="play-btn" class="icon-btn" aria-label="Play">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button id="step-fwd-btn" class="icon-btn" aria-label="Next event" title="Next event (across all machines)">
+        <svg viewBox="0 0 24 24"><path d="M13 6v12l8.5-6zM11 6L2.5 12 11 18z" transform="scale(-1,1) translate(-24,0)"/></svg>
+      </button>
+      <button id="skip-end-btn" class="icon-btn" aria-label="Jump to end" title="Jump to end">
+        <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM4 6l11 6-11 6z"/></svg>
+      </button>
+      <button id="restart-btn" class="icon-btn" aria-label="Restart" title="Restart from 0">
+        <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+      </button>
+    </div>
+    <div class="slider-wrap">
+      <span class="slider-time" id="slider-time-label">0.0</span>
+      <input type="range" id="time-slider" min="0" max="154.1" value="0" step="0.1">
+      <span class="slider-time">154.1</span>
+    </div>
+    <div class="speed-group" id="speed-group">
+      <button class="speed-btn" data-speed="0.5">0.5x</button>
+      <button class="speed-btn active" data-speed="1">1x</button>
+      <button class="speed-btn" data-speed="2">2x</button>
+      <button class="speed-btn" data-speed="4">4x</button>
+    </div>
+  </div>
+
+  <div class="legend-row">
+    <button class="legend-btn" data-type="0"><span class="legend-swatch" style="background:#7F77DD;"></span>Job type A</button>
+    <button class="legend-btn" data-type="1"><span class="legend-swatch" style="background:#1D9E75;"></span>Job type B</button>
+    <button class="legend-btn" data-type="2"><span class="legend-swatch" style="background:#D85A30;"></span>Job type C</button>
+    <span class="legend-hint">Click a job type to isolate it · click a machine card to jump to its next job · hover bars for details · space to play/pause · arrow keys to nudge time</span>
+  </div>
+
+</div>
+
+<script>
+const data = {"history": [{"m": 1, "j": 0, "t": 1, "s": 0.2, "e": 2.2}, {"m": 2, "j": 1, "t": 2, "s": 0.4, "e": 1.4}, {"m": 1, "j": 1, "t": 2, "s": 2.2, "e": 6.2}, {"m": 1, "j": 2, "t": 1, "s": 6.2, "e": 7.2}, {"m": 1, "j": 3, "t": 1, "s": 7.2, "e": 8.2}, {"m": 0, "j": 4, "t": 0, "s": 11.9, "e": 15.9}, {"m": 0, "j": 5, "t": 0, "s": 15.9, "e": 18.9}, {"m": 0, "j": 6, "t": 0, "s": 18.9, "e": 21.9}, {"m": 0, "j": 2, "t": 1, "s": 21.9, "e": 26.9}, {"m": 0, "j": 7, "t": 0, "s": 26.9, "e": 29.9}, {"m": 2, "j": 2, "t": 1, "s": 29.0, "e": 31.0}, {"m": 0, "j": 3, "t": 1, "s": 29.9, "e": 34.9}, {"m": 2, "j": 8, "t": 2, "s": 31.0, "e": 33.0}, {"m": 2, "j": 10, "t": 2, "s": 33.0, "e": 35.0}, {"m": 1, "j": 12, "t": 1, "s": 34.8, "e": 35.8}, {"m": 0, "j": 0, "t": 1, "s": 34.9, "e": 40.9}, {"m": 2, "j": 3, "t": 1, "s": 35.0, "e": 36.0}, {"m": 1, "j": 7, "t": 0, "s": 35.8, "e": 37.8}, {"m": 2, "j": 11, "t": 2, "s": 36.0, "e": 38.0}, {"m": 1, "j": 4, "t": 0, "s": 37.8, "e": 40.8}, {"m": 2, "j": 9, "t": 2, "s": 38.0, "e": 41.0}, {"m": 1, "j": 11, "t": 2, "s": 40.8, "e": 42.8}, {"m": 0, "j": 13, "t": 0, "s": 40.9, "e": 44.9}, {"m": 2, "j": 15, "t": 2, "s": 41.0, "e": 43.0}, {"m": 1, "j": 5, "t": 0, "s": 42.8, "e": 45.8}, {"m": 2, "j": 0, "t": 1, "s": 43.0, "e": 45.0}, {"m": 0, "j": 12, "t": 1, "s": 44.9, "e": 50.9}, {"m": 2, "j": 14, "t": 2, "s": 45.0, "e": 48.0}, {"m": 1, "j": 16, "t": 1, "s": 45.8, "e": 46.8}, {"m": 1, "j": 13, "t": 0, "s": 46.8, "e": 48.8}, {"m": 2, "j": 5, "t": 0, "s": 48.0, "e": 53.0}, {"m": 1, "j": 6, "t": 0, "s": 48.8, "e": 51.8}, {"m": 0, "j": 17, "t": 0, "s": 50.9, "e": 54.9}, {"m": 1, "j": 8, "t": 2, "s": 51.8, "e": 54.8}, {"m": 2, "j": 12, "t": 1, "s": 53.0, "e": 54.0}, {"m": 2, "j": 6, "t": 0, "s": 54.0, "e": 56.0}, {"m": 1, "j": 19, "t": 1, "s": 54.8, "e": 55.8}, {"m": 0, "j": 18, "t": 0, "s": 54.9, "e": 59.9}, {"m": 1, "j": 17, "t": 0, "s": 55.8, "e": 57.8}, {"m": 2, "j": 4, "t": 0, "s": 56.0, "e": 62.0}, {"m": 1, "j": 10, "t": 2, "s": 57.8, "e": 60.8}, {"m": 0, "j": 19, "t": 1, "s": 59.9, "e": 64.9}, {"m": 1, "j": 9, "t": 2, "s": 60.8, "e": 63.8}, {"m": 2, "j": 17, "t": 0, "s": 62.0, "e": 67.0}, {"m": 1, "j": 18, "t": 0, "s": 63.8, "e": 66.8}, {"m": 0, "j": 20, "t": 0, "s": 64.9, "e": 67.9}, {"m": 1, "j": 15, "t": 2, "s": 66.8, "e": 70.8}, {"m": 2, "j": 19, "t": 1, "s": 67.0, "e": 69.0}, {"m": 0, "j": 22, "t": 0, "s": 67.9, "e": 70.9}, {"m": 2, "j": 23, "t": 2, "s": 69.0, "e": 71.0}, {"m": 1, "j": 20, "t": 0, "s": 70.8, "e": 72.8}, {"m": 0, "j": 16, "t": 1, "s": 70.9, "e": 76.9}, {"m": 2, "j": 21, "t": 2, "s": 71.0, "e": 74.0}, {"m": 1, "j": 22, "t": 0, "s": 72.8, "e": 75.8}, {"m": 2, "j": 20, "t": 0, "s": 74.0, "e": 78.0}, {"m": 1, "j": 23, "t": 2, "s": 75.8, "e": 78.8}, {"m": 0, "j": 25, "t": 0, "s": 77.8, "e": 81.8}, {"m": 2, "j": 24, "t": 2, "s": 78.0, "e": 80.0}, {"m": 1, "j": 21, "t": 2, "s": 78.8, "e": 81.8}, {"m": 2, "j": 16, "t": 1, "s": 80.0, "e": 82.0}, {"m": 1, "j": 27, "t": 1, "s": 81.8, "e": 82.8}, {"m": 2, "j": 26, "t": 2, "s": 82.0, "e": 84.0}, {"m": 1, "j": 25, "t": 0, "s": 82.8, "e": 84.8}, {"m": 2, "j": 18, "t": 0, "s": 84.0, "e": 89.0}, {"m": 1, "j": 28, "t": 1, "s": 84.8, "e": 86.8}, {"m": 1, "j": 24, "t": 2, "s": 86.8, "e": 89.8}, {"m": 2, "j": 29, "t": 2, "s": 89.0, "e": 92.0}, {"m": 1, "j": 26, "t": 2, "s": 89.8, "e": 92.8}, {"m": 2, "j": 25, "t": 0, "s": 92.0, "e": 96.0}, {"m": 1, "j": 14, "t": 2, "s": 92.8, "e": 96.8}, {"m": 2, "j": 30, "t": 2, "s": 96.0, "e": 99.0}, {"m": 1, "j": 29, "t": 2, "s": 96.8, "e": 100.8}, {"m": 2, "j": 13, "t": 0, "s": 99.0, "e": 105.0}, {"m": 1, "j": 30, "t": 2, "s": 100.8, "e": 104.8}, {"m": 0, "j": 31, "t": 0, "s": 100.9, "e": 103.9}, {"m": 0, "j": 27, "t": 1, "s": 103.9, "e": 108.9}, {"m": 1, "j": 31, "t": 0, "s": 104.8, "e": 107.8}, {"m": 2, "j": 32, "t": 2, "s": 105.0, "e": 107.0}, {"m": 2, "j": 33, "t": 2, "s": 107.0, "e": 110.0}, {"m": 1, "j": 32, "t": 2, "s": 107.8, "e": 110.8}, {"m": 0, "j": 28, "t": 1, "s": 108.9, "e": 115.9}, {"m": 2, "j": 27, "t": 1, "s": 110.0, "e": 111.0}, {"m": 1, "j": 33, "t": 2, "s": 110.8, "e": 113.8}, {"m": 2, "j": 31, "t": 0, "s": 111.0, "e": 115.0}, {"m": 2, "j": 34, "t": 2, "s": 115.0, "e": 118.0}, {"m": 2, "j": 28, "t": 1, "s": 118.0, "e": 119.0}, {"m": 2, "j": 22, "t": 0, "s": 119.0, "e": 125.0}, {"m": 2, "j": 7, "t": 0, "s": 125.0, "e": 132.0}, {"m": 1, "j": 35, "t": 1, "s": 128.5, "e": 130.5}, {"m": 1, "j": 34, "t": 2, "s": 130.5, "e": 135.5}, {"m": 0, "j": 36, "t": 0, "s": 134.3, "e": 138.3}, {"m": 0, "j": 35, "t": 1, "s": 138.3, "e": 144.3}, {"m": 2, "j": 37, "t": 2, "s": 143.9, "e": 145.9}, {"m": 1, "j": 36, "t": 0, "s": 144.1, "e": 146.1}, {"m": 2, "j": 35, "t": 1, "s": 145.9, "e": 146.9}, {"m": 1, "j": 38, "t": 1, "s": 146.1, "e": 148.1}, {"m": 2, "j": 36, "t": 0, "s": 146.9, "e": 149.9}, {"m": 1, "j": 39, "t": 1, "s": 148.1, "e": 150.1}, {"m": 1, "j": 37, "t": 2, "s": 150.1, "e": 154.1}], "makespan": 154.1, "num_machines": 3};
+const typeColors = ["#7F77DD", "#1D9E75", "#D85A30"];
+const typeNames = ["A", "B", "C"];
+const M = data.num_machines;
+const gRows = document.getElementById("gantt-rows");
+const mCards = document.getElementById("machine-cards");
+const tooltip = document.getElementById("tooltip");
+const ganttWrap = tooltip.parentElement;
+
+for (let m = 0; m < M; m++) {
+  const label = document.createElement("div");
+  label.className = "gantt-row-label";
+  label.textContent = "Machine " + m;
+  gRows.appendChild(label);
+
+  const row = document.createElement("div");
+  row.className = "gantt-row";
+  data.history.filter(e => e.m === m).sort((a,b) => a.s - b.s).forEach(e => {
+    const seg = document.createElement("div");
+    const left = (e.s / data.makespan) * 100;
+    const width = ((e.e - e.s) / data.makespan) * 100;
+    seg.dataset.type = e.t;
+    seg.style.cssText = `position:absolute; left:${left}%; width:${width}%; top:0; bottom:0; background:${typeColors[e.t]}; border-radius:3px; cursor:pointer; transition:filter 0.1s, opacity 0.15s;`;
+    seg.addEventListener("mouseenter", () => {
+      seg.style.filter = "brightness(1.25)";
+      tooltip.style.display = "block";
+      tooltip.innerHTML = `<b>Job ${e.j}</b> · type ${typeNames[e.t]}<br>Machine ${e.m}<br>${e.s.toFixed(1)} → ${e.e.toFixed(1)} (${(e.e-e.s).toFixed(1)} units)`;
+    });
+    seg.addEventListener("mousemove", (ev) => {
+      const rect = ganttWrap.getBoundingClientRect();
+      tooltip.style.left = (ev.clientX - rect.left + 12) + "px";
+      tooltip.style.top = (ev.clientY - rect.top - 40) + "px";
+    });
+    seg.addEventListener("mouseleave", () => {
+      seg.style.filter = "none";
+      tooltip.style.display = "none";
+    });
+    seg.addEventListener("click", () => { slider.value = e.s; updateAtTime(e.s); });
+    row.appendChild(seg);
+  });
+  const playhead = document.createElement("div");
+  playhead.className = "playhead-" + m;
+  playhead.style.cssText = "position:absolute; top:-3px; bottom:-3px; width:2px; background:#f5f5f5; left:0%; pointer-events:none;";
+  row.appendChild(playhead);
+  gRows.appendChild(row);
+
+  const card = document.createElement("div");
+  card.className = "machine-card";
+  card.innerHTML = `<p class="label">Machine ${m}</p>
+    <div class="status-row">
+      <span id="dot-${m}" style="width:10px; height:10px; border-radius:50%; background:#555; display:inline-block;"></span>
+      <span id="status-${m}" class="status-text">Idle</span>
+    </div>
+    <p class="util-text">Utilization: <span id="util-${m}">0%</span></p>
+    <p class="hint">&#8594; jump to next job</p>`;
+  card.addEventListener("click", () => {
+    document.querySelectorAll(".machine-card").forEach(c => c.classList.remove("selected"));
+    card.classList.add("selected");
+    const t = parseFloat(slider.value);
+    const next = data.history.filter(e2 => e2.m === m && e2.s > t).sort((a,b) => a.s - b.s)[0];
+    if (next) { slider.value = next.s; updateAtTime(next.s); }
+  });
+  mCards.appendChild(card);
+}
+
+function updateAtTime(t) {
+  document.getElementById("stat-time").textContent = t.toFixed(1);
+  document.getElementById("slider-time-label").textContent = t.toFixed(1);
+  let opsCompleted = 0;
+  let totalBusy = 0;
+  for (let m = 0; m < M; m++) {
+    const segs = data.history.filter(e => e.m === m);
+    const active = segs.find(e => e.s <= t && t < e.e);
+    const busySoFar = segs.filter(e => e.e <= t).reduce((a, e) => a + (e.e - e.s), 0)
+      + (active ? (t - active.s) : 0);
+    totalBusy += busySoFar;
+    opsCompleted += segs.filter(e => e.e <= t).length;
+    const util = t > 0 ? Math.round((busySoFar / t) * 100) : 0;
+    document.getElementById(`util-${m}`).textContent = util + "%";
+    const dot = document.getElementById(`dot-${m}`);
+    const status = document.getElementById(`status-${m}`);
+    if (active) {
+      dot.style.background = typeColors[active.t];
+      status.textContent = "Processing job " + typeNames[active.t];
+    } else {
+      dot.style.background = "#555";
+      status.textContent = "Idle";
+    }
+    const ph = document.querySelector(".playhead-" + m);
+    ph.style.left = ((t / data.makespan) * 100) + "%";
+  }
+  document.getElementById("stat-ops").textContent = opsCompleted;
+  const avgUtil = t > 0 ? Math.round((totalBusy / (M * t)) * 100) : 0;
+  document.getElementById("stat-util").textContent = avgUtil + "%";
+}
+
+const slider = document.getElementById("time-slider");
+const playBtn = document.getElementById("play-btn");
+const restartBtn = document.getElementById("restart-btn");
+const skipStartBtn = document.getElementById("skip-start-btn");
+const skipEndBtn = document.getElementById("skip-end-btn");
+const stepBackBtn = document.getElementById("step-back-btn");
+const stepFwdBtn = document.getElementById("step-fwd-btn");
+slider.addEventListener("input", () => updateAtTime(parseFloat(slider.value)));
+updateAtTime(0);
+
+function goTo(t) {
+  const clamped = Math.max(0, Math.min(data.makespan, t));
+  slider.value = clamped;
+  updateAtTime(clamped);
+}
+skipStartBtn.addEventListener("click", () => { pausePlayback(); goTo(0); });
+skipEndBtn.addEventListener("click", () => { pausePlayback(); goTo(data.makespan); });
+stepBackBtn.addEventListener("click", () => {
+  const t = parseFloat(slider.value);
+  const boundaries = data.history.flatMap(e => [e.s, e.e]).filter(x => x < t - 0.001);
+  if (boundaries.length) goTo(Math.max(...boundaries));
+});
+stepFwdBtn.addEventListener("click", () => {
+  const t = parseFloat(slider.value);
+  const boundaries = data.history.flatMap(e => [e.s, e.e]).filter(x => x > t + 0.001);
+  if (boundaries.length) goTo(Math.min(...boundaries));
+});
+
+const PLAY_ICON = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+const PAUSE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+
+let playing = false;
+let rafId = null;
+let lastTs = null;
+let speed = 1;
+function step(ts) {
+  if (!playing) return;
+  if (lastTs === null) lastTs = ts;
+  const dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+  let v = parseFloat(slider.value) + dt * 12 * speed;
+  if (v >= data.makespan) {
+    v = data.makespan;
+    playing = false;
+    playBtn.innerHTML = PLAY_ICON;
+  }
+  slider.value = v;
+  updateAtTime(v);
+  if (playing) rafId = requestAnimationFrame(step);
+}
+function togglePlay() {
+  playing = !playing;
+  playBtn.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+  if (playing) {
+    if (parseFloat(slider.value) >= data.makespan) { slider.value = 0; updateAtTime(0); }
+    lastTs = null;
+    rafId = requestAnimationFrame(step);
+  } else if (rafId) {
+    cancelAnimationFrame(rafId);
+  }
+}
+function pausePlayback() {
+  playing = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  playBtn.innerHTML = PLAY_ICON;
+}
+playBtn.addEventListener("click", togglePlay);
+restartBtn.addEventListener("click", () => { pausePlayback(); goTo(0); });
+
+const speedButtons = document.querySelectorAll(".speed-btn");
+speedButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    speed = parseFloat(btn.dataset.speed);
+    speedButtons.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  });
+});
+
+let activeTypeFilter = null;
+const legendButtons = document.querySelectorAll(".legend-btn");
+function applyTypeFilter() {
+  legendButtons.forEach(btn => {
+    const t = parseInt(btn.dataset.type);
+    btn.classList.toggle("dimmed", activeTypeFilter !== null && activeTypeFilter !== t);
+  });
+  document.querySelectorAll(".gantt-row").forEach(row => {
+    Array.from(row.children).forEach(seg => {
+      if (!seg.dataset || seg.dataset.type === undefined) return;
+      const t = parseInt(seg.dataset.type);
+      seg.style.opacity = (activeTypeFilter === null || activeTypeFilter === t) ? "1" : "0.15";
+    });
+  });
+}
+legendButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const t = parseInt(btn.dataset.type);
+    activeTypeFilter = (activeTypeFilter === t) ? null : t;
+    applyTypeFilter();
+  });
+});
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT") return;
+  if (ev.code === "Space") { ev.preventDefault(); togglePlay(); }
+  if (ev.code === "ArrowRight") { goTo(parseFloat(slider.value) + 1); }
+  if (ev.code === "ArrowLeft") { goTo(parseFloat(slider.value) - 1); }
+});
+</script>
+</body>
+</html>
